@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Short-Order Saints — Playtest Prototype</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { width:100%; height:100%; overflow:hidden; overscroll-behavior:none; }
+  body {
+    font-family:-apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color:#f5ead6; user-select:none; -webkit-user-select:none;
+    background:#241410;
+    background-image:radial-gradient(circle at 50% 0%, #3a2118 0%, #241410 70%);
+  }
+  #fx { position:fixed; inset:0; display:block; pointer-events:none; z-index:5; }
+
+  /* ---------- HUD ---------- */
+  .hud {
+    position:fixed; top:0; left:0; right:0; z-index:10;
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
+    padding:10px 12px; pointer-events:none;
+  }
+  .pill {
+    background:rgba(30,18,12,.88); border:1px solid #6b4a2f; border-radius:999px;
+    padding:7px 13px; font-size:13.5px; font-weight:700; letter-spacing:.3px; white-space:nowrap;
+  }
+  #credits { color:#ffd75e; }
+  #timer { color:#9fd8ff; }
+  #town {
+    flex:1; max-width:280px; background:rgba(30,18,12,.88); border:1px solid #6b4a2f;
+    border-radius:999px; padding:6px 12px; font-size:11.5px; font-weight:600; color:#f5ead6;
+  }
+  #town .bar { height:6px; background:#1a0f0a; border-radius:99px; margin-top:5px; overflow:hidden; }
+  #town .fill { height:100%; width:0%; background:linear-gradient(90deg,#e4572e,#f3a712); border-radius:99px; transition:width .4s; }
+
+  /* ---------- ticket rail ---------- */
+  #railLabel {
+    position:fixed; top:58px; left:14px; z-index:9; font-size:12px; font-weight:700;
+    letter-spacing:2px; color:#c9a06a; text-transform:uppercase;
+  }
+  #rail {
+    position:fixed; top:78px; left:0; right:0; z-index:9;
+    display:flex; gap:10px; padding:4px 14px 10px; overflow:hidden;
+    min-height:128px;
+  }
+  .ticket {
+    flex:0 0 148px; background:#f5ead6; color:#3a2418; border-radius:10px;
+    border-top:8px solid #e4572e; box-shadow:0 4px 14px rgba(0,0,0,.45);
+    padding:8px 9px 9px; cursor:pointer; position:relative;
+    animation:slideIn .35s ease-out;
+  }
+  .ticket:nth-child(odd) { transform:rotate(-1.2deg); }
+  .ticket:nth-child(even) { transform:rotate(1.1deg); }
+  @keyframes slideIn { from { transform:translateX(120vw) rotate(6deg); opacity:.4; } to { opacity:1; } }
+  .ticket:active { transform:scale(.95); }
+  .ticket .who { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+  .ticket .face { font-size:26px; line-height:1; }
+  .ticket .name { font-size:12.5px; font-weight:800; }
+  .ticket .dish { font-size:13px; font-weight:700; color:#8a4a1d; margin:2px 0; }
+  .ticket .line { font-size:11px; font-style:italic; color:#6b4a2f; line-height:1.35; min-height:30px; }
+  .ticket .firehint {
+    margin-top:6px; text-align:center; font-size:11px; font-weight:800; letter-spacing:1px;
+    color:#fff; background:#2e9e8f; border-radius:6px; padding:5px 0; text-transform:uppercase;
+  }
+
+  /* ---------- grill ---------- */
+  #grillLabel {
+    position:fixed; bottom:172px; left:14px; z-index:9; font-size:12px; font-weight:700;
+    letter-spacing:2px; color:#c9a06a; text-transform:uppercase;
+  }
+  #grill {
+    position:fixed; left:0; right:0; bottom:64px; z-index:9;
+    display:flex; gap:10px; justify-content:center; align-items:flex-end;
+    padding:0 14px; min-height:104px; pointer-events:none;
+  }
+  .cook, .plate {
+    width:150px; background:#312016; border:2px solid #6b4a2f; border-radius:12px;
+    padding:8px; text-align:center; position:relative; pointer-events:none;
+  }
+  .cook .cface { font-size:22px; }
+  .cook .sizzle { font-size:12px; font-weight:800; color:#ffb35c; letter-spacing:2px; margin-top:4px; }
+  .cook .steam { font-size:20px; animation:rise 1s ease-in-out infinite; display:block; }
+  @keyframes rise { 0%{transform:translateY(4px);opacity:.5} 50%{transform:translateY(-4px);opacity:1} 100%{transform:translateY(4px);opacity:.5} }
+  .plate { border-color:#f3a712; background:#3a2a16; animation:pop .3s ease-out; }
+  @keyframes pop { from { transform:scale(.7); } to { transform:scale(1); } }
+  .plate .bigdish { font-size:44px; line-height:1.1; }
+  .plate .perfect {
+    display:inline-block; font-size:11px; font-weight:800; letter-spacing:1px; color:#1d1208;
+    background:#ffd75e; border-radius:99px; padding:3px 10px; margin:4px 0;
+  }
+  .plate .tip { font-size:15px; font-weight:800; }
+  .plate .tip.small { color:#9fd8ff; }
+  .plate .tip.big { color:#ffd75e; }
+  .plate .tip.none { color:#c9a06a; font-size:12.5px; }
+  .float-tip {
+    position:fixed; z-index:11; font-size:20px; font-weight:800; pointer-events:none;
+    animation:floatUp 1.4s ease-out forwards;
+  }
+  @keyframes floatUp { from { transform:translateY(0); opacity:1; } to { transform:translateY(-70px); opacity:0; } }
+
+  /* ---------- menu board disclosure ---------- */
+  #menuboard {
+    position:fixed; bottom:10px; left:50%; transform:translateX(-50%); z-index:10;
+    background:#1d1208; border:2px solid #8a6a3f; border-radius:8px;
+    padding:7px 16px; font-size:12px; font-weight:700; letter-spacing:.5px; color:#f3e3bd;
+    white-space:nowrap; pointer-events:none; max-width:94vw; overflow:hidden; text-overflow:ellipsis;
+    font-family:Georgia, "Times New Roman", serif; font-style:italic;
+  }
+  #menuboard::before { content:"\1F4CB  "; font-style:normal; }
+
+  /* ---------- overlay ---------- */
+  #overlay {
+    position:fixed; inset:0; z-index:20; display:none;
+    align-items:center; justify-content:center; background:rgba(16,9,5,.95); padding:24px;
+  }
+  #overlay.show { display:flex; }
+  .card {
+    width:100%; max-width:430px; max-height:92vh; overflow-y:auto;
+    background:#2c1a10; border:1px solid #6b4a2f; border-radius:16px; padding:26px 22px; text-align:center;
+  }
+  .card h1 { font-size:22px; margin-bottom:10px; color:#ffd75e; }
+  .card p { font-size:14.5px; line-height:1.55; color:#e8d5b5; margin-bottom:12px; }
+  .card .q { font-size:16px; font-weight:700; color:#fff; margin:18px 0 10px; line-height:1.4; }
+  .card .q:first-of-type { margin-top:6px; }
+  .btnrow { display:flex; gap:10px; justify-content:center; margin-bottom:2px; flex-wrap:wrap; }
+  .btn {
+    flex:1 1 0; min-width:88px; padding:13px 8px; font-size:15px; font-weight:700;
+    border-radius:12px; border:1px solid #6b4a2f; background:#3a2418; color:#fff; cursor:pointer;
+  }
+  .btn:active { transform:scale(.96); }
+  .btn.yes { background:#2c5f3a; border-color:#3f8a55; }
+  .btn.no  { background:#5f2c2c; border-color:#8a3f3f; }
+  .btn.maybe { background:#4a4426; border-color:#7a6f3f; }
+  .bigbtn {
+    display:block; width:100%; padding:15px; font-size:17px; font-weight:700;
+    border-radius:12px; border:none; background:#e4572e; color:#fff; cursor:pointer; margin-top:8px;
+  }
+  .bigbtn:active { transform:scale(.97); }
+  .fineprint { font-size:12px; color:#a88a63; margin-top:14px; line-height:1.5; }
+  table.results { width:100%; border-collapse:collapse; margin:14px 0; font-size:13.5px; }
+  table.results th, table.results td { border:1px solid #6b4a2f; padding:7px 5px; }
+  table.results th { background:#3a2418; }
+  .kill { font-weight:800; font-size:15px; padding:10px; border-radius:10px; margin-top:10px; line-height:1.45; }
+  .kill.bad { background:#5f2c2c; color:#ffb3b3; }
+  .kill.good { background:#2c5f3a; color:#b3ffc9; }
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+
+<div class="hud">
+  <div class="pill" id="credits">1,000 credits</div>
+  <div id="town">
+    <span id="townLabel">Feed the whole town — 0/60 plates</span>
+    <div class="bar"><div class="fill" id="townFill"></div></div>
+  </div>
+  <div class="pill" id="timer">5:00</div>
+</div>
+
+<div id="railLabel">Order tickets &mdash; tap to fire</div>
+<div id="rail"></div>
+
+<div id="grillLabel">On the flat top</div>
+<div id="grill"></div>
+
+<div id="menuboard">every plate pays the same &mdash; you pick the pace</div>
+
+<div id="overlay"><div class="card" id="card"></div></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ================= config ================= */
+  var BET = 10;                 // credits wagered per fired ticket
+  var START_CREDITS = 1000;
+  var SESSION_SECONDS = 300;    // 5 minutes
+  var MAX_TICKETS = 4;          // tickets waiting on the rail
+  var SPAWN_MS = 1100;          // new ticket cadence
+  var COOK_MS = 2000;           // sizzle time per ticket (~2s)
+  var REVEAL_MS = 1700;         // plate reveal linger
+  var TOWN_GOAL = 60;           // "feed the whole town" plates goal
+  var RESULTS_KEY = 'd8comp_results_v1';
+
+  // One ticket fired = one spin. Fixed RNG, ~96% payback.
+  // r < 0.60 -> no tip | < 0.92 -> tip 15 | < 0.98 -> tip 40 | else tip 120
+  // EV = 0.32*15 + 0.06*40 + 0.02*120 = 4.8 + 2.4 + 2.4 = 9.6 on a 10 bet.
+  function resolveSpin() {
+    var r = Math.random();
+    if (r < 0.60) return 0;
+    if (r < 0.92) return 15;
+    if (r < 0.98) return 40;
+    return 120;
+  }
+
+  /* ================= query params ================= */
+  var params = new URLSearchParams(window.location.search || '');
+  if (params.get('t')) {
+    var tt = parseInt(params.get('t'), 10);
+    if (tt > 0 && tt <= 3600) SESSION_SECONDS = tt;
+  }
+  var resultsMode = params.get('results') === '1';
+
+  /* ================= regulars ================= */
+  // 12 recurring regulars. Serialized one-liners cycle per regular.
+  var REGULARS = [
+    { name:'Trucker Joe',  face:'\uD83D\uDE9B', dish:'\uD83C\uDF54', dishName:'Roadhouse Burger', lines:["Coffee, black, and keep it comin'.", "Four hundred miles on an empty stomach. Fix that."] },
+    { name:'Nurse Ada',    face:'\uD83D\uDC69\u200D\u2695\uFE0F', dish:'\uD83C\uDF73', dishName:'Sunrise Special', lines:["Night shift's over — feed me.", "If it has eggs, I'm already happy."] },
+    { name:'Coach Ray',    face:'\uD83C\uDFC8', dish:'\uD83C\uDF2F', dishName:'Champ Burrito', lines:["The usual, champ.", "Carb-load me like it's playoffs."] },
+    { name:'Grandma Lou',  face:'\uD83D\uDC75', dish:'\uD83E\uDD58', dishName:'Sunday Pot Pie', lines:["Extra gravy, honey.", "You cook like my late Harold. Bless you."] },
+    { name:'DJ Marv',      face:'\uD83C\uDFA7', dish:'\uD83C\uDF55', dishName:'Midnight Slice', lines:["Something greasy, stat.", "The booth's dead till I eat. Hurry, chef."] },
+    { name:'Farmer Paz',   face:'\uD83C\uDF3E', dish:'\uD83E\uDD5E', dishName:'Harvest Stack', lines:["Stack 'em high.", "Up since 4am. My stomach's filing a complaint."] },
+    { name:'Kid Sammy',    face:'\uD83D\uDE39', dish:'\uD83E\uDD63', dishName:'Dino Cakes', lines:["Pancakes shaped like a dinosaur?", "Mom says I can have the big stack. She means it."] },
+    { name:'Officer Dana', face:'\uD83D\uDE94', dish:'\uD83E\uDD6A', dishName:'Stakeout Sandwich', lines:["To go — I'm double-parked.", "Quiet shift. Loud sandwich, please."] },
+    { name:'Poet Wren',    face:'\uD83D\uDCD3', dish:'\uD83C\uDF2E', dishName:'Muse Taco', lines:["Surprise me, darling.", "Write my order in the stars. Or just tacos."] },
+    { name:'Mechanic Gus', face:'\uD83D\uDD27', dish:'\u2615', dishName:'Wrench Fuel', lines:["Burnt ends and black coffee.", "Engine's fixed. Now fix my hunger."] },
+    { name:'Tilly',        face:'\uD83D\uDC8D', dish:'\uD83C\uDF70', dishName:'Bridal Brunch', lines:["Brunch before the fitting!", "He proposed at this counter. Feed the legend."] },
+    { name:'Night-owl Ned',face:'\uD83E\uDD89', dish:'\uD83E\uDD53', dishName:'2AM Blues Plate', lines:["Breakfast at 2am. Don't judge.", "The moon and I both run on bacon."] }
+  ];
+  var lineIdx = {}; // per-regular rotating line index
+
+  /* ================= tiny synth (Web Audio, no files) ================= */
+  var actx = null;
+  function audio() {
+    try {
+      if (!actx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        actx = new AC();
+      }
+      if (actx.state === 'suspended') actx.resume();
+      return actx;
+    } catch (e) { return null; }
+  }
+  function blip(freq, dur, when, type, gain) {
+    var ac = audio(); if (!ac) return;
+    try {
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = type || 'sine'; o.frequency.value = freq;
+      var t = ac.currentTime + (when || 0);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(gain || 0.12, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(ac.destination);
+      o.start(t); o.stop(t + dur + 0.05);
+    } catch (e) {}
+  }
+  function sfx(kind) {
+    try {
+      if (kind === 'ding') { blip(880, 0.18, 0, 'triangle', 0.10); blip(1174, 0.22, 0.09, 'triangle', 0.10); }
+      else if (kind === 'fire') { blip(392, 0.12, 0, 'square', 0.06); blip(587, 0.14, 0.07, 'square', 0.06); }
+      else if (kind === 'coin') { blip(1318, 0.12, 0, 'sine', 0.10); blip(1568, 0.16, 0.08, 'sine', 0.10); }
+      else if (kind === 'sizzle') {
+        var ac = audio(); if (!ac) return;
+        var len = Math.floor(ac.sampleRate * 1.5);
+        var buf = ac.createBuffer(1, len, ac.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+        var src = ac.createBufferSource(); src.buffer = buf;
+        var f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 5200; f.Q.value = 0.8;
+        var g = ac.createGain(); g.gain.value = 0.05;
+        src.connect(f); f.connect(g); g.connect(ac.destination);
+        src.start();
+      }
+    } catch (e) {}
+  }
+
+  /* ================= dom ================= */
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  }
+
+  var railEl = $('rail'), grillEl = $('grill'), overlay = $('overlay'), card = $('card');
+  var creditsEl = $('credits'), timerEl = $('timer');
+  var townFill = $('townFill'), townLabel = $('townLabel');
+
+  /* ================= steam canvas ================= */
+  var canvas = $('fx');
+  var ctx = null;
+  try { ctx = canvas.getContext('2d'); } catch (e) { ctx = null; }
+  var W = 0, H = 0;
+  function resize() {
+    var DPR = 1;
+    try { DPR = Math.min(window.devicePixelRatio || 1, 2); } catch (e) {}
+    W = window.innerWidth; H = window.innerHeight;
+    if (canvas && canvas.width !== undefined) {
+      canvas.width = Math.floor(W * DPR); canvas.height = Math.floor(H * DPR);
+      canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    }
+    if (ctx && ctx.setTransform) ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  try { window.addEventListener('resize', resize); } catch (e) {}
+  resize();
+  var steams = []; // {x,y,vx,vy,r,age,life}
+  function puff(x, y) {
+    steams.push({ x: x + (Math.random() - 0.5) * 60, y: y,
+      vx: (Math.random() - 0.5) * 20, vy: -40 - Math.random() * 50,
+      r: 6 + Math.random() * 10, age: 0, life: 1.2 + Math.random() * 0.8 });
+  }
+  function drawSteam(dt) {
+    if (!ctx || !ctx.clearRect) return;
+    ctx.clearRect(0, 0, W, H);
+    for (var i = steams.length - 1; i >= 0; i--) {
+      var s = steams[i];
+      s.age += dt; s.x += s.vx * dt; s.y += s.vy * dt; s.r += 14 * dt;
+      if (s.age >= s.life) { steams.splice(i, 1); continue; }
+      var a = 0.35 * (1 - s.age / s.life);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#e8e0d0';
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ================= state ================= */
+  var credits = START_CREDITS;
+  var spins = 0;
+  var plates = 0;
+  var timeLeft = SESSION_SECONDS;
+  var playing = false, started = false;
+  var tickets = [];   // waiting on rail: {el, reg, line}
+  var cooks = [];     // on grill: {el, reg, elapsed, revealed}
+  var reveals = [];   // plate cards: {el, elapsed}
+  var lastSpawn = 0, lastTick = 0;
+
+  function fmt(n) { return n.toLocaleString('en-US'); }
+  function updateHud() { creditsEl.textContent = fmt(credits) + ' credits'; }
+  function updateTimer() {
+    var m = Math.floor(timeLeft / 60), s = Math.floor(timeLeft % 60);
+    timerEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function updateTown() {
+    townLabel.textContent = 'Feed the whole town — ' + plates + '/' + TOWN_GOAL + ' plates';
+    townFill.style.width = Math.min(100, 100 * plates / TOWN_GOAL) + '%';
+  }
+
+  /* ================= tickets ================= */
+  function pickRegular() {
+    return REGULARS[(Math.random() * REGULARS.length) | 0];
+  }
+  function spawnTicket() {
+    if (tickets.length >= MAX_TICKETS) return;
+    var reg = pickRegular();
+    var li = lineIdx[reg.name] || 0;
+    var line = reg.lines[li % reg.lines.length];
+    lineIdx[reg.name] = li + 1;
+
+    var t = el('div', 'ticket');
+    var who = el('div', 'who');
+    who.appendChild(el('span', 'face', reg.face));
+    who.appendChild(el('span', 'name', reg.name));
+    t.appendChild(who);
+    t.appendChild(el('div', 'dish', reg.dish + ' ' + reg.dishName));
+    t.appendChild(el('div', 'line', '\u201C' + line + '\u201D'));
+    t.appendChild(el('div', 'firehint', 'Tap to fire'));
+    var ticket = { el: t, reg: reg, line: line };
+    t.addEventListener('pointerdown', function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      fireTicket(ticket);
+    });
+    railEl.appendChild(t);
+    tickets.push(ticket);
+    sfx('ding');
+  }
+
+  function floatTip(x, y, text, color) {
+    var f = el('div', 'float-tip', text);
+    f.style.left = (x - 30) + 'px'; f.style.top = (y - 20) + 'px'; f.style.color = color;
+    document.body.appendChild(f);
+    setTimeout(function () { if (f.parentNode) f.parentNode.removeChild(f); }, 1500);
+  }
+
+  /* ================= the wager: tap ticket = one spin ================= */
+  function fireTicket(ticket) {
+    if (!playing) return;
+    var i = tickets.indexOf(ticket);
+    if (i < 0) return;                 // already fired
+    tickets.splice(i, 1);
+    if (ticket.el.parentNode) ticket.el.parentNode.removeChild(ticket.el);
+
+    // commit the bet at the tap
+    credits -= BET;
+    spins++;
+    updateHud();
+    sfx('fire'); sfx('sizzle');
+
+    var c = el('div', 'cook');
+    c.appendChild(el('div', 'cface', ticket.reg.face));
+    c.appendChild(el('span', 'steam', '\u2668'));  // steaming bowl-ish wisp marker
+    c.appendChild(el('div', 'sizzle', 'SIZZLING…'));
+    grillEl.appendChild(c);
+    cooks.push({ el: c, reg: ticket.reg, elapsed: 0 });
+  }
+
+  function revealCook(cook) {
+    // ---- RNG decides. Food is ALWAYS perfect; only the TIP varies. ----
+    var win = resolveSpin();
+    credits += win;
+    plates++;
+    updateHud(); updateTown();
+
+    if (cook.el.parentNode) cook.el.parentNode.removeChild(cook.el);
+
+    var p = el('div', 'plate');
+    p.appendChild(el('div', 'bigdish', cook.reg.dish));
+    p.appendChild(el('div', 'perfect', '\u2B50 PERFECT'));
+    var tip = el('div', 'tip');
+    if (win === 0) {
+      tip.className = 'tip none';
+      tip.textContent = 'No tip — still loved it';
+    } else if (win >= 120) {
+      tip.className = 'tip big';
+      tip.textContent = 'WHALE TIP +' + fmt(win) + ' \uD83D\uDCB5\uD83D\uDCB5\uD83D\uDCB5';
+      sfx('coin');
+    } else if (win >= 40) {
+      tip.className = 'tip big';
+      tip.textContent = 'Nice tip +' + fmt(win) + ' \uD83E\uDE99\uD83E\uDE99';
+      sfx('coin');
+    } else {
+      tip.className = 'tip small';
+      tip.textContent = 'Small tip +' + fmt(win) + ' \uD83E\uDE99';
+      sfx('coin');
+    }
+    p.appendChild(tip);
+    grillEl.appendChild(p);
+    reveals.push({ el: p, elapsed: 0 });
+
+    if (win > 0) {
+      var r = p.getBoundingClientRect ? p.getBoundingClientRect() : null;
+      var fx = r ? r.left + r.width / 2 : W / 2, fy = r ? r.top : H - 200;
+      floatTip(fx, fy, '+' + fmt(win), win >= 40 ? '#ffd75e' : '#9fd8ff');
+    }
+  }
+
+  /* ================= results storage ================= */
+  function loadResults() {
+    try { return JSON.parse(localStorage.getItem(RESULTS_KEY) || '[]'); }
+    catch (e) { return []; }
+  }
+  function saveResults(arr) {
+    try { localStorage.setItem(RESULTS_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+
+  /* ================= overlay screens ================= */
+  function showStart() {
+    card.innerHTML = '';
+    card.appendChild(el('h1', null, 'Short-Order Saints'));
+    var p1 = el('p', null, 'You\u2019re the cook at a cozy corner diner. Order tickets slide in from your regulars — tap a ticket to fire it on the flat top. Every plate lands PERFECT; the tip on the plate is the luck of the draw.');
+    card.appendChild(p1);
+    var p2 = el('p', null, 'Tickets never expire and nobody gets angry. Fire fast, fire slow — you pick the pace. You have 5 minutes. Feed the whole town!');
+    card.appendChild(p2);
+    var fine = el('div', 'fineprint', 'Honest rules: every plate pays the same. Which regular you cook for, how fast you cook, and the always-perfect food do NOT change your tips — those are random.');
+    var btn = el('button', 'bigbtn', 'Start cooking');
+    btn.addEventListener('click', startSession);
+    card.appendChild(btn);
+    card.appendChild(fine);
+    card.appendChild(el('div', 'fineprint', 'Playtest prototype — no real money. Your 3 answers are sent to the test team when you finish.'));
+    overlay.classList.add('show');
+  }
+
+  function startSession() {
+    overlay.classList.remove('show');
+    started = true; playing = true;
+    lastTick = performance.now();
+    lastSpawn = lastTick;
+    updateHud(); updateTimer(); updateTown();
+    requestAnimationFrame(loop);
+  }
+
+  function answerButtons(qnum, onPick) {
+    var row = el('div', 'btnrow');
+    var opts = [['yes', 'Yes', 'yes'], ['no', 'No', 'no'], ['notsure', 'Not sure', 'maybe']];
+    for (var i = 0; i < opts.length; i++) {
+      (function (val, label, cls) {
+        var b = el('button', 'btn ' + cls, label);
+        b.setAttribute('data-q', String(qnum));
+        b.setAttribute('data-v', val);
+        b.addEventListener('click', function () {
+          var sibs = row.querySelectorAll('.btn');
+          for (var j = 0; j < sibs.length; j++) sibs[j].style.outline = '';
+          b.style.outline = '3px solid #9fd8ff';
+          onPick(val);
+        });
+        row.appendChild(b);
+      })(opts[i][0], opts[i][1], opts[i][2]);
+    }
+    return row;
+  }
+
+  function showQuestionnaire() {
+    playing = false;
+    var a1 = null, a2 = null, a3 = null;
+    card.innerHTML = '';
+    card.appendChild(el('h1', null, 'Shift\u2019s over!'));
+    var mins = Math.round(SESSION_SECONDS / 60);
+    card.appendChild(el('p', null, 'You fired ' + spins + ' tickets in ' + mins + ' minute' + (mins === 1 ? '' : 's') +
+      ', served ' + plates + ' plates, and finished with ' + fmt(credits) + ' credits. Three quick questions:'));
+    card.appendChild(el('div', 'q', '1. Did some customers\u2019 orders pay better than others?'));
+    card.appendChild(answerButtons(1, function (v) { a1 = v; maybeDone(); }));
+    card.appendChild(el('div', 'q', '2. Did cooking faster change the tips?'));
+    card.appendChild(answerButtons(2, function (v) { a2 = v; maybeDone(); }));
+    card.appendChild(el('div', 'q', '3. The food was perfect every time, but the tips went up and down. Did the food cause the bigger tips?'));
+    card.appendChild(answerButtons(3, function (v) { a3 = v; maybeDone(); }));
+    card.appendChild(el('div', 'fineprint', 'Answer all three to finish. There are no wrong answers — we want your honest read.'));
+    overlay.classList.add('show');
+
+    function maybeDone() {
+      if (a1 && a2 && a3) {
+        var arr = loadResults();
+        arr.push({ q1: a1, q2: a2, q3: a3, spins: spins, credits: credits, plates: plates, ts: Date.now() });
+        saveResults(arr);
+        card.innerHTML = '';
+        card.appendChild(el('h1', null, 'Thank you!'));
+        card.appendChild(el('p', null, 'Your answers were sent to the test team. That\u2019s the whole test — you can close this page now.'));
+        var code = { yes: 'Y', no: 'N', notsure: 'S' };
+        var resultCode = (code[a1] || '?') + ' ' + (code[a2] || '?') + ' ' + (code[a3] || '?');
+        var beaconVal = { yes: 'Yes', no: 'No', notsure: 'Not+sure' };
+        var url = 'https://docs.google.com/forms/d/e/1FAIpQLSfD24qH4-5sjJR0RcxO7JAnjcTYhD0l0l9Gb3BlQ1K6p_Sgsg/formResponse' +
+          '?entry.247599708=' + (beaconVal[a1] || '') +
+          '&entry.1434129261=' + (beaconVal[a2] || '') +
+          '&entry.1787567284=' + (beaconVal[a3] || '');
+        // fetch in no-cors mode: resolves once Google receives it, rejects only
+        // on a real network failure. (The old Image-pixel trick always fired its
+        // error handler on iPhone because Google returns a page, not a picture.)
+        try {
+          fetch(url, { mode: 'no-cors', credentials: 'omit' }).then(function () {}, function () {
+            card.appendChild(el('p', 'fineprint', 'Could not send automatically (no internet?). Please text these 3 letters to the person who sent you the game: ' + resultCode + ' (Y = Yes, N = No, S = Not sure).'));
+          });
+        } catch (e) {
+          var beacon = new Image();   // last-resort ping for ancient browsers
+          beacon.src = url;
+        }
+        card.appendChild(el('div', 'fineprint', 'Playtest prototype — no real money.'));
+      }
+    }
+  }
+
+  function showResearcher() {
+    var arr = loadResults();
+    var n = arr.length;
+    var c = [
+      { yes: 0, no: 0, notsure: 0 },
+      { yes: 0, no: 0, notsure: 0 },
+      { yes: 0, no: 0, notsure: 0 }
+    ];
+    for (var i = 0; i < n; i++) {
+      if (c[0][arr[i].q1] !== undefined) c[0][arr[i].q1]++;
+      if (c[1][arr[i].q2] !== undefined) c[1][arr[i].q2]++;
+      if (c[2][arr[i].q3] !== undefined) c[2][arr[i].q3]++;
+    }
+    var pcts = [0, 0, 0];
+    for (var q = 0; q < 3; q++) pcts[q] = n ? (100 * c[q].yes / n) : 0;
+    var killQ = -1;
+    for (var k = 0; k < 3; k++) { if (n > 0 && pcts[k] > 30) { killQ = k; break; } }
+
+    card.innerHTML = '';
+    card.appendChild(el('h1', null, 'Researcher view'));
+    card.appendChild(el('p', null, 'Sessions on this device: ' + n));
+    var tbl = el('table', 'results');
+    var head = el('tr');
+    head.appendChild(el('th')); head.appendChild(el('th', null, 'Yes'));
+    head.appendChild(el('th', null, 'No')); head.appendChild(el('th', null, 'Not sure'));
+    tbl.appendChild(head);
+    var labels = [
+      'Q1 — some customers\u2019 orders paid better?',
+      'Q2 — cooking faster changed tips?',
+      'Q3 — perfect food caused bigger tips?'
+    ];
+    for (var r = 0; r < 3; r++) {
+      var tr = el('tr');
+      tr.appendChild(el('td', null, labels[r] + '  (' + pcts[r].toFixed(1) + '% yes)'));
+      tr.appendChild(el('td', null, String(c[r].yes)));
+      tr.appendChild(el('td', null, String(c[r].no)));
+      tr.appendChild(el('td', null, String(c[r].notsure)));
+      tbl.appendChild(tr);
+    }
+    card.appendChild(tbl);
+    if (n > 0) {
+      var verdict = el('div', 'kill ' + (killQ >= 0 ? 'bad' : 'good'));
+      if (killQ >= 0) {
+        verdict.textContent = 'KILL CRITERION MET — ' + pcts[killQ].toFixed(1) + '% answered \u201Cyes\u201D on Q' + (killQ + 1) + ' (>30%). D8 dies or is redesigned.';
+      } else {
+        verdict.textContent = 'Below kill threshold — worst \u201Cyes\u201D rate is ' + Math.max(pcts[0], pcts[1], pcts[2]).toFixed(1) + '% (\u226430%). D8 survives this falsifier.';
+      }
+      card.appendChild(verdict);
+    }
+    var fp = el('div', 'fineprint', 'Kill criterion: >30% \u201Cyes\u201D on ANY question \u2192 the agency illusion teaches the odds fallacy; D8 dies or is redesigned.');
+    var clearBtn = el('button', 'btn', 'Clear all sessions');
+    clearBtn.style.marginTop = '10px';
+    clearBtn.addEventListener('click', function () { saveResults([]); showResearcher(); });
+    fp.appendChild(clearBtn);
+    card.appendChild(fp);
+    overlay.classList.add('show');
+  }
+
+  /* ================= main loop ================= */
+  function loop(now) {
+    var dt = Math.min((now - lastTick) / 1000, 0.05);
+    lastTick = now;
+
+    if (playing) {
+      timeLeft -= dt;
+      if (timeLeft <= 0) { timeLeft = 0; updateTimer(); showQuestionnaire(); return; }
+      updateTimer();
+      if (now - lastSpawn > SPAWN_MS) { lastSpawn = now; spawnTicket(); }
+    }
+
+    // cooks: sizzle, then reveal
+    for (var i = cooks.length - 1; i >= 0; i--) {
+      var ck = cooks[i];
+      ck.elapsed += dt * 1000;
+      if (Math.random() < dt * 8 && ctx) {
+        var r = ck.el.getBoundingClientRect ? ck.el.getBoundingClientRect() : null;
+        puff(r ? r.left + r.width / 2 : W / 2, r ? r.top + 10 : H - 220);
+      }
+      if (ck.elapsed >= COOK_MS) { cooks.splice(i, 1); revealCook(ck); }
+    }
+    // reveals: linger, then clear
+    for (var j = reveals.length - 1; j >= 0; j--) {
+      var rv = reveals[j];
+      rv.elapsed += dt * 1000;
+      if (rv.elapsed >= REVEAL_MS) {
+        if (rv.el.parentNode) rv.el.parentNode.removeChild(rv.el);
+        reveals.splice(j, 1);
+      }
+    }
+
+    drawSteam(dt);
+    if (playing || started) requestAnimationFrame(loop);
+  }
+
+  /* ================= boot ================= */
+  // test hooks (no network; used by the headless verification harness)
+  window.__d8 = {
+    get state() {
+      return { credits: credits, spins: spins, plates: plates, tickets: tickets.length,
+               cooks: cooks.length, playing: playing, started: started, timeLeft: timeLeft };
+    },
+    fireFirst: function () { if (tickets.length) fireTicket(tickets[0]); },
+    endSession: function () { timeLeft = 0.01; },
+    resolveSpin: resolveSpin,
+    getResults: loadResults,
+    REG_COUNT: REGULARS.length
+  };
+
+  updateHud(); updateTimer(); updateTown();
+  if (resultsMode) { showResearcher(); return; }
+  showStart();
+})();
+</script>
+</body>
+</html>
