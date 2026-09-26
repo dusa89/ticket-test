@@ -201,7 +201,6 @@
     if (tt > 0 && tt <= 3600) SESSION_SECONDS = tt;
   }
   var resultsMode = params.get('results') === '1';
-  var skipMode = params.get('skip') === '1';   // ?skip=1 jumps straight to the questions (for re-takers)
 
   /* ================= regulars ================= */
   // 12 recurring regulars. Serialized one-liners cycle per regular.
@@ -461,6 +460,13 @@
     card.appendChild(btn);
     card.appendChild(fine);
     card.appendChild(el('div', 'fineprint', 'Playtest prototype — no real money. Your 3 answers are sent to the test team when you finish.'));
+    var skipWrap = el('div', 'fineprint', '');
+    var skipLink = el('a', null, 'Already played? Skip straight to the questions \u2192');
+    skipLink.href = '#';
+    skipLink.style.color = '#9fd8ff';
+    skipLink.addEventListener('click', function (ev) { ev.preventDefault(); showQuestionnaire(true); });
+    skipWrap.appendChild(skipLink);
+    card.appendChild(skipWrap);
     overlay.classList.add('show');
   }
 
@@ -658,7 +664,6 @@
 
   updateHud(); updateTimer(); updateTown();
   if (resultsMode) { showResearcher(); return; }
-  if (skipMode) { showQuestionnaire(true); return; }
   showStart();
 })();
 </script>
