@@ -201,6 +201,7 @@
     if (tt > 0 && tt <= 3600) SESSION_SECONDS = tt;
   }
   var resultsMode = params.get('results') === '1';
+  var skipMode = params.get('skip') === '1';   // ?skip=1 jumps straight to the questions (for re-takers)
 
   /* ================= regulars ================= */
   // 12 recurring regulars. Serialized one-liners cycle per regular.
@@ -492,25 +493,32 @@
     return row;
   }
 
-  function showQuestionnaire() {
+  function showQuestionnaire(skipped) {
     playing = false;
     var a1 = null, a2 = null, a3 = null;
     card.innerHTML = '';
-    card.appendChild(el('h1', null, 'Shift\u2019s over!'));
-    var mins = Math.round(SESSION_SECONDS / 60);
-    card.appendChild(el('p', null, 'You fired ' + spins + ' tickets in ' + mins + ' minute' + (mins === 1 ? '' : 's') +
-      ', served ' + plates + ' plates, and finished with ' + fmt(credits) + ' credits. Three quick questions:'));
-    card.appendChild(el('div', 'q', '1. Did some customers\u2019 orders pay better than others?'));
+    if (skipped) {
+      card.appendChild(el('h1', null, 'Quick follow-up!'));
+      card.appendChild(el('p', null, 'You already played the game, so no replay needed \u2014 just three quick questions with the new wording:'));
+    } else {
+      card.appendChild(el('h1', null, 'Shift\u2019s over!'));
+      var mins = Math.round(SESSION_SECONDS / 60);
+      card.appendChild(el('p', null, 'You fired ' + spins + ' tickets in ' + mins + ' minute' + (mins === 1 ? '' : 's') +
+        ', served ' + plates + ' plates, and finished with ' + fmt(credits) + ' credits. Three quick questions:'));
+    }
+    card.appendChild(el('div', 'q', '1. Do you feel it was just luck that some customers tipped bigger than others?'));
     card.appendChild(answerButtons(1, function (v) { a1 = v; maybeDone(); }));
-    card.appendChild(el('div', 'q', '2. Did cooking faster change the tips?'));
+    card.appendChild(el('div', 'q', '2. Do you feel tapping faster got you bigger tips?'));
     card.appendChild(answerButtons(2, function (v) { a2 = v; maybeDone(); }));
-    card.appendChild(el('div', 'q', '3. The food was perfect every time, but the tips went up and down. Did the food cause the bigger tips?'));
+    card.appendChild(el('div', 'q', '3. The food was always perfect, but some tips were bigger than others. Did it seem like the food was the reason?'));
     card.appendChild(answerButtons(3, function (v) { a3 = v; maybeDone(); }));
     card.appendChild(el('div', 'fineprint', 'Answer all three to finish. There are no wrong answers — we want your honest read.'));
     overlay.classList.add('show');
 
     function maybeDone() {
       if (a1 && a2 && a3) {
+        // One response per session: ignore accidental double-taps on the last answer.
+        try { if (sessionStorage.getItem('d8_submitted') === '1') return; sessionStorage.setItem('d8_submitted', '1'); } catch (e) {}
         var arr = loadResults();
         arr.push({ q1: a1, q2: a2, q3: a3, spins: spins, credits: credits, plates: plates, ts: Date.now() });
         saveResults(arr);
@@ -650,6 +658,7 @@
 
   updateHud(); updateTimer(); updateTown();
   if (resultsMode) { showResearcher(); return; }
+  if (skipMode) { showQuestionnaire(true); return; }
   showStart();
 })();
 </script>
