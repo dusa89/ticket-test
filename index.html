@@ -522,10 +522,41 @@
     overlay.classList.add('show');
 
     function maybeDone() {
-      if (a1 && a2 && a3) {
-        // One response per session: ignore accidental double-taps on the last answer.
-        try { if (sessionStorage.getItem('d8_submitted') === '1') return; sessionStorage.setItem('d8_submitted', '1'); } catch (e) {}
-        var arr = loadResults();
+      if (a1 && a2 && a3) showConfirm();
+    }
+
+    // Confirmation step: nothing is saved or sent until the tester reviews
+    // their answers and taps Submit. Accidental tap-throughs stop here.
+    function showConfirm() {
+      var label = { yes: 'Yes', no: 'No', notsure: 'Not sure' };
+      var qs = [
+        'Do you feel it was just luck that some customers tipped bigger than others?',
+        'Do you feel tapping faster got you bigger tips?',
+        'The food was always perfect, but some tips were bigger than others. Did it seem like the food was the reason?'
+      ];
+      var ans = [a1, a2, a3];
+      card.innerHTML = '';
+      card.appendChild(el('h1', null, 'Check your answers'));
+      card.appendChild(el('p', null, 'Here\u2019s what you picked. Tap Submit to send them, or go back to change anything.'));
+      for (var i = 0; i < 3; i++) {
+        card.appendChild(el('div', 'q', (i + 1) + '. ' + qs[i]));
+        card.appendChild(el('p', null, 'Your answer: ' + (label[ans[i]] || ans[i])));
+      }
+      card.appendChild(el('div', 'fineprint', 'There are no wrong answers \u2014 we want your honest read.'));
+      var row = el('div', 'btnrow');
+      var back = el('button', 'btn maybe', 'Go back and change');
+      back.addEventListener('click', function () { showQuestionnaire(skipped); });
+      var go = el('button', 'btn yes', 'Submit answers');
+      go.addEventListener('click', doSubmit);
+      row.appendChild(back);
+      row.appendChild(go);
+      card.appendChild(row);
+    }
+
+    function doSubmit() {
+      // One response per session: ignore accidental double-taps on Submit.
+      try { if (sessionStorage.getItem('d8_submitted') === '1') return; sessionStorage.setItem('d8_submitted', '1'); } catch (e) {}
+      var arr = loadResults();
         arr.push({ q1: a1, q2: a2, q3: a3, spins: spins, credits: credits, plates: plates, ts: Date.now() });
         saveResults(arr);
         card.innerHTML = '';
@@ -550,7 +581,6 @@
           beacon.src = url;
         }
         card.appendChild(el('div', 'fineprint', 'Playtest prototype — no real money.'));
-      }
     }
   }
 
